@@ -1,10 +1,12 @@
 
-pacman::p_load(tidyverse, rebus, survey, srvyr, gridExtra, haven, stringr)
+pacman::p_load(tidyverse, rebus, survey, srvyr, gridExtra, readstata13, stringr,plotly)
 
-SDEMYCOEST419 <- read_dta(paste0(carpeta_enoe, "4T/limpia/sdemycoest419.dta"))
+carpeta_enoe <- "/home/julio/Documents/DataScience/coders/"
+
+SDEMYCOEST320 <- read.dta13(paste0(carpeta_enoe, "sdemycoest320", ".dta"))
 
 
-SDEMYCOEST419 <- SDEMYCOEST419 %>%  mutate(ent = str_pad(ent, 2, pad = "0"),
+SDEMYCOEST320 <- SDEMYCOEST320 %>%  mutate(ent = str_pad(ent, 2, pad = "0"),
                                            sex=ifelse(sex==1,"Hombre",sex),
                                            sex=ifelse(sex==2,"Mujer",sex),
                                            niv_ins=ifelse(niv_ins==0,"No aplica",niv_ins),
@@ -187,6 +189,44 @@ SDEMYCOEST419 <- SDEMYCOEST419 %>%  mutate(ent = str_pad(ent, 2, pad = "0"),
                                            hij5c=ifelse(hij5c==4,"De 6 hijos y más",hij5c),
                                            hij5c=ifelse(hij5c==5,"No especificado",hij5c))
 
-SYC419_svyset <- SDEMYCOEST419 %>% as_survey_design(strata = est, weights = fac, id = upm, nest=TRUE)
+SYC320_svyset <- SDEMYCOEST320 %>% as_survey_design(strata = est_d_tri, weights = fac_tri, id = upm, nest=TRUE)
 
-### HOLA ES LA COLABORACI�N DE AMAURY
+# Colaboración de julio}
+Ingresos_H <- svytable(~pos_ocu+ing7c+sex, design = subset(SYC320_svyset, ent== "09")) %>% 
+  data.frame() %>% filter(Freq != 0) %>% rename(Total = Freq) %>% mutate(ent= "CDMX") %>%  
+  filter(pos_ocu %in% c("Subordinados y remunerados"), sex !="Mujer") %>% mutate(Porcentaje = 100 * (Total / sum(Total)))
+
+Ingresos_M <- svytable(~pos_ocu+ing7c+sex, design = subset(SYC320_svyset, ent== "09")) %>% 
+  data.frame() %>% filter(Freq != 0) %>% rename(Total = Freq) %>% mutate(ent= "CDMX") %>%  
+  filter(pos_ocu %in% c("Subordinados y remunerados"), sex !="Hombre") %>% mutate(Porcentaje = 100 * (Total / sum(Total)))
+
+Ingresos <- bind_rows(Ingresos_H,Ingresos_M)
+rm(Ingresos_H,Ingresos_M)
+
+Ingresos %>%
+  group_by(pos_ocu) %>% 
+  ggplot(aes( x  = ing7c, y = Porcentaje, fill = sex)) +
+  labs(title = "", y = "Porcentaje", x = "", caption = "Fuente: Elaboración de la DEET con datos de ENOE_N, 3T2020 INEGI.
+       Nota: Los subordinados y remunerados son no agropecuarios") +
+  geom_col() + 
+  theme_light() +
+  scale_fill_manual(values = c("#00b140", "#7343be"), name = "") +
+  theme(legend.position="bottom") +
+  geom_text(aes(label = round(Porcentaje,1)), 
+            position = position_stack(vjust = 0.5), color="white", size =5) +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 15))
+
+
+Ingresos %>%
+  group_by(pos_ocu) %>%  View()
+
+fig <- Ingresos %>% mutate(p_hombres = ifelse(sex=="Hombre",Porcentaje,NA), p_mujeres = ifelse(sex=="Mujer",Porcentaje,NA)) %>% 
+  group_by(pos_ocu) %>% plot_ly(
+    x=~ing7c, y = ~p_hombres, type = "bar",name = 'Hombres'
+  )
+
+fig <- fig %>% add_trace(y = ~p_mujeres, name = 'Mujeres')
+fig <- fig %>% layout(yaxis = list(title = ''), barmode = 'stack')
+
+fig
+
