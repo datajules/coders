@@ -201,6 +201,7 @@ Sexo_Rama_H <- svytable(~pos_ocu+rama_est2+sex, design = subset(SYC320_svyset, e
 
 
 
+
 Sexo_Rama_M <- svytable(~pos_ocu+rama_est2+sex, design = subset(SYC320_svyset, ent== "09")) %>% 
   data.frame() %>% filter(Freq != 0) %>% rename(Total = Freq) %>% mutate(ent= "CDMX") %>% 
   filter(pos_ocu %in% c("Subordinados y remunerados")) %>% filter(sex != "Hombre") %>%  
